@@ -1,56 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Dynamic Scatterplot</title>
-  <script src="https://d3js.org/d3.v5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.16.9/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <meta charset="UTF-8">
+    <title>CSV to Chart</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        .chart-container {
+            width: 800px;
+            height: 600px;
+            margin: auto;
+        }
+    </style>
 </head>
 <body>
-  <div id="plot"></div>
-  <script>
-    // Load data from Excel file
-    var url = "data.xlsx";
-    var req = new XMLHttpRequest();
-    req.open("GET", url, true);
-    req.responseType = "arraybuffer";
-    req.onload = function(e) {
-      var data = new Uint8Array(req.response);
-      var workbook = XLSX.read(data, {type:"array"});
-      var sheetName = workbook.SheetNames[0];
-      var sheet = workbook.Sheets[sheetName];
-      var json = XLSX.utils.sheet_to_json(sheet, {header:1});
-      
-      // Get variable names and data from user input
-      var xVar = prompt("Enter variable for x-axis:", "Variable 1");
-      var yVar = prompt("Enter variable for y-axis:", "Variable 2");
-      var xData = json[0].map(function(d) { return parseFloat(d); });
-      var yData = json[0].map(function(d, i) { return parseFloat(json[i][yVar]); });
-      var textData = json[0].map(function(d, i) { return json[i]["ID"]; });
-      
-      // Create plot
-      var trace1 = {
-        x: xData,
-        y: yData,
-        mode: 'markers',
-        text: textData,
-        marker: {
-          size: 12,
-          color: 'rgb(51, 153, 255)'
+    <input type="file" id="csv-file" accept=".csv">
+    <div class="chart-container">
+        <canvas id="myChart"></canvas>
+    </div>
+    <script>
+        document.getElementById('csv-file').addEventListener('change', handleFileSelect, false);
+
+        function handleFileSelect(event) {
+            const reader = new FileReader();
+            reader.readAsText(event.target.files[0]);
+            reader.onload = function(event) {
+                const csv = event.target.result;
+                const data = d3.csvParse(csv);
+                let xVar = prompt('Enter the name of the X-axis variable (column name):');
+                let yVar = prompt('Enter the name of the Y-axis variable (column name):');
+                let xData = data.map(d => d[xVar]);
+                let yData = data.map(d => d[yVar]);
+
+                if (typeof xData[0] === 'string' && typeof yData[0] === 'string') {
+                    // Draw a bar chart
+                    let trace = {
+                        x: yData,
+                        y: xData,
+                        type: 'bar'
+                    };
+                    let layout = {
+                        title: yVar + ' vs ' + xVar,
+                        xaxis: {
+                            title: yVar
+                        },
+                        yaxis: {
+                            title: xVar
+                        }
+                    };
+                    Plotly.newPlot('myChart', [trace], layout);
+                } else if (typeof xData[0] === 'number' && typeof yData[0] === 'number') {
+                    // Draw a scatter plot
+                    let trace = {
+                        x: xData,
+                        y: yData,
+                        mode: 'markers',
+                        type: 'scatter'
+                    };
+                    let layout = {
+                        title: yVar + ' vs ' + xVar,
+                        xaxis: {
+                            title: xVar
+                        },
+                        yaxis: {
+                            title: yVar
+                        }
+                    };
+                    Plotly.newPlot('myChart', [trace], layout);
+                } else {
+                    // Draw a pie chart
+                    let labels = [...new Set(xData)];
+                    let values = labels.map(label => xData.filter(x => x === label).length);
+                    let trace = {
+                        values: values,
+                        labels: labels,
+                        type: 'pie'
+                    };
+                    let layout = {
+                        title: xVar,
+                    };
+                    Plotly.newPlot('myChart', [trace], layout);
+                }
+            };
         }
-      };
-      var data = [trace1];
-      var layout = {
-        xaxis: {
-          title: xVar
-        },
-        yaxis: {
-          title: yVar
-        }
-      };
-      Plotly.newPlot('plot', data, layout);
-    }
-    req.send();
-  </script>
+    </script>
 </body>
 </html>
