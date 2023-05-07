@@ -1,88 +1,104 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>CSV to Chart</title>
-    <script src="https://d3js.org/d3.v6.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        .chart-container {
-            width: 800px;
-            height: 600px;
-            margin: auto;
-        }
-    </style>
+	<meta charset="utf-8">
+	<title>Plotting CSV Data</title>
+	<script src="https://d3js.org/d3.v7.min.js"></script>
+	<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <input type="file" id="csv-file" accept=".csv">
-    <div class="chart-container">
-        <canvas id="myChart"></canvas>
-    </div>
-    <script>
-        document.getElementById('csv-file').addEventListener('change', handleFileSelect, false);
+	<input type="file" id="csvFileInput" accept=".xlsx">
+	<div id="plot"></div>
 
-        function handleFileSelect(event) {
-            const reader = new FileReader();
-            reader.readAsText(event.target.files[0]);
-            reader.onload = function(event) {
-                const csv = event.target.result;
-                const data = d3.csvParse(csv);
-                let xVar = prompt('Enter the name of the X-axis variable (column name):');
-                let yVar = prompt('Enter the name of the Y-axis variable (column name):');
-                let xData = data.map(d => d[xVar]);
-                let yData = data.map(d => d[yVar]);
+	<script>
+		function handleFileSelect(event) {
+			const file = event.target.files[0];
+			const reader = new FileReader();
 
-                if (typeof xData[0] === 'string' && typeof yData[0] === 'string') {
-                    // Draw a bar chart
-                    let trace = {
-                        x: yData,
-                        y: xData,
-                        type: 'bar'
-                    };
-                    let layout = {
-                        title: yVar + ' vs ' + xVar,
-                        xaxis: {
-                            title: yVar
-                        },
-                        yaxis: {
-                            title: xVar
-                        }
-                    };
-                    Plotly.newPlot('myChart', [trace], layout);
-                } else if (typeof xData[0] === 'number' && typeof yData[0] === 'number') {
-                    // Draw a scatter plot
-                    let trace = {
-                        x: xData,
-                        y: yData,
-                        mode: 'markers',
-                        type: 'scatter'
-                    };
-                    let layout = {
-                        title: yVar + ' vs ' + xVar,
-                        xaxis: {
-                            title: xVar
-                        },
-                        yaxis: {
-                            title: yVar
-                        }
-                    };
-                    Plotly.newPlot('myChart', [trace], layout);
-                } else {
-                    // Draw a pie chart
-                    let labels = [...new Set(xData)];
-                    let values = labels.map(label => xData.filter(x => x === label).length);
-                    let trace = {
-                        values: values,
-                        labels: labels,
-                        type: 'pie'
-                    };
-                    let layout = {
-                        title: xVar,
-                    };
-                    Plotly.newPlot('myChart', [trace], layout);
-                }
-            };
-        }
-    </script>
+			reader.onload = function(event) {
+				const data = new Uint8Array(event.target.result);
+				const workbook = XLSX.read(data, {type: 'array'});
+				const sheetName = workbook.SheetNames[0];
+				const sheet = workbook.Sheets[sheetName];
+				const csvData = XLSX.utils.sheet_to_json(sheet);
+
+				const selectX = document.createElement("select");
+				const selectY = document.createElement("select");
+				const option = document.createElement("option");
+				option.text = "Select variable";
+				selectX.add(option);
+				selectY.add(option.cloneNode(true));
+				for (const key in csvData[0]) {
+					if (!isNaN(parseFloat(csvData[0][key]))) {
+						const option = document.createElement("option");
+						option.text = key;
+						selectX.add(option);
+						selectY.add(option.cloneNode(true));
+					}
+				}
+
+				selectX.onchange = function() {
+					plotData(selectX.value, selectY.value);
+				}
+				selectY.onchange = function() {
+					plotData(selectX.value, selectY.value);
+				}
+
+				document.body.appendChild(selectX);
+				document.body.appendChild(selectY);
+
+				plotData(selectX.value, selectY.value);
+			};
+
+			reader.readAsArrayBuffer(file);
+		}
+
+		function plotData(xVar, yVar) {
+			const xData = [];
+			const yData = [];
+
+			for (const row of csvData) {
+				if (row[xVar] && row[yVar]) {
+					xData.push(row[xVar]);
+					yData.push(row[yVar]);
+				}
+			}
+
+			const plotDiv = document.getElementById('plot');
+			plotDiv.innerHTML = '';
+
+			if (isNaN(parseFloat(xData[0]))) {
+				const data = [{
+					type: 'bar',
+					x: xData,
+					y: yData
+				}];
+
+				Plotly.newPlot(plotDiv, data);
+			} else {
+				const trace1 = {
+					x: xData,
+					y: yData,
+					mode: 'markers',
+					type: 'scatter'
+				};
+
+				const data = [trace1];
+
+				const layout = {
+					xaxis: {
+						title: xVar
+					},
+					yaxis: {
+						title: yVar
+					}
+				};
+
+				Plotly.newPlot(plotDiv, data, layout);
+			}
+		}
+
+		document.getElementById('csvFileInput').addEventListener('change', handleFileSelect, false);
+	</script>
 </body>
 </html>
